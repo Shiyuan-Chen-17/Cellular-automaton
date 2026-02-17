@@ -1,0 +1,1 @@
+Simple experiments with cellular automaton. Currently just an interactive implementation of conways' game of life; will hopefully include interacive rule setting and beyond directly adjacent neighbour monitoring, along with more interesting visuals.
