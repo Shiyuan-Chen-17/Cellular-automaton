@@ -109,10 +109,12 @@ if __name__ == '__main__':
     disable_echo()
 
     try:
-        with Live(render_grid(grid), refresh_per_second=20) as live:
+        with Live(render_grid(grid), refresh_per_second=20, screen=True) as live:
             while True:
                 time.sleep(0.2)
                 grid = update_array(grid, rows, columns)
                 live.update(render_grid(grid))
+    except KeyboardInterrupt:
+        pass
     finally:
         restore_terminal_settings()
