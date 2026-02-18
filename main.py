@@ -6,9 +6,17 @@ from rich.live import Live
 from rich.text import Text
 from rich.panel import Panel
 from rich.console import Console
+import argparse
+
 console = Console()
 
+#Setup arguments for argparser
+parser = argparse.ArgumentParser(description="A visual cellular automaton simulator")
+parser.add_argument("--seed", help='Specify seed', type=int)
+parser.add_argument("--prob", help='Specify the probability that each cell is alive (from 1-100)', type=int)
 _saved_settings = None
+args=parser.parse_args()
+
 
 def save_terminal_settings():
     global _saved_settings
@@ -31,13 +39,20 @@ def disable_echo():
 def init_grid():
     columns = console.size.width - 4
     rows = console.size.height // 2 - 1
-    living_probability, random_seed = map(int, input('living_probability, random seed: ').split(', '))
+    if args.seed: 
+        random_seed = args.seed
+    else:
+        random_seed = random.randint(0, 10000000000000)
+    if args.prob: 
+        living_probability = args.prob
+    else:
+        living_probability = random.randint(35, 65)
     grid = [[0 for _ in range(columns)] for _ in range(rows)]
     random.seed(random_seed)
     for y in range(1, columns-1):
         for x in range(1, rows-1):
             state=random.randint(1, 100)
-            if state<living_probability:
+            if state<=living_probability:
                 grid[x][y] = 1
 
     return rows, columns, grid
