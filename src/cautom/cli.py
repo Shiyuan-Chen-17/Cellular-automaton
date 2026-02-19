@@ -14,6 +14,8 @@ console = Console()
 parser = argparse.ArgumentParser(description="A visual cellular automaton simulator")
 parser.add_argument("--seed", help='Specify seed', type=int)
 parser.add_argument("--prob", help='Specify the probability that each cell is alive (from 1-100)', type=int)
+parser.add_argument("--infinite", action='store_true', help='Generate new seed on complete death')
+parser.add_argument("--customrules", help="Specify custom game rules (B##/S##)", type=str)
 _saved_settings = None
 args=parser.parse_args()
 
@@ -36,10 +38,10 @@ def disable_echo():
     new_attr[3] = new_attr[3] & ~termios.ECHO 
     termios.tcsetattr(fd, termios.TCSANOW, new_attr)
 
-def init_grid():
+def init_grid(seed):
     columns = console.size.width - 4
     rows = console.size.height // 2 - 1
-    if args.seed: 
+    if args.seed and seed != None: 
         random_seed = args.seed
     else:
         random_seed = random.randint(0, 10000000000000)
@@ -47,6 +49,7 @@ def init_grid():
         living_probability = args.prob
     else:
         living_probability = random.randint(35, 65)
+    print (random_seed)
     grid = [[0 for _ in range(columns)] for _ in range(rows)]
     random.seed(random_seed)
     for y in range(1, columns-1):
@@ -54,8 +57,19 @@ def init_grid():
             state=random.randint(1, 100)
             if state<=living_probability:
                 grid[x][y] = 1
+    birth = [3]
+    survive = [2, 3]
 
-    return rows, columns, grid
+    if args.customrules:
+        try:
+            rules_raw = args.customrules.upper().split("/S")
+            birth = [int(n) for n in rules_raw[0][1:]]
+            survive = [int(n) for n in rules_raw[1]]
+        except Exception:
+            print("Invalid custom rule format. Use B##/S## (example: B3/S23)")
+            sys.exit(1)
+
+    return rows, columns, grid, birth, survive
 
 
 def sum_surrounding(grid, x, y):
@@ -71,20 +85,20 @@ def sum_surrounding(grid, x, y):
     )
 
 
-def update_array(grid, rows, columns):
+def update_array(grid, rows, columns, birth, survive):
     new_grid = [row[:] for row in grid]
 
     for x in range(1, rows-1):
         for y in range(1, columns-1):
 
-            neighbors = sum_surrounding(grid, x, y)
+            neighbours = sum_surrounding(grid, x, y)
 
-            if grid[x][y] == 0 and neighbors == 3:
-                new_grid[x][y] =1
-            elif grid[x][y] != 0 and (neighbors < 2 or neighbors > 3):
-                new_grid[x][y] = 0
-            elif grid[x][y] != 0 and (neighbors == 2 or neighbors == 3):
+            if grid[x][y] == 0 and neighbours in birth:
+                new_grid[x][y] = 1
+            elif grid[x][y] != 0 and neighbours in survive:
                 new_grid[x][y] += 1
+            else:
+                new_grid[x][y] = 0
 
     return new_grid
 
@@ -102,7 +116,7 @@ def render_grid(grid):
     return Panel(text, title="Game of Life", border_style="cyan")
 
 def main():
-    rows, columns, grid = init_grid()
+    rows, columns, grid, birth, survive = init_grid(None)
 
     save_terminal_settings()
     disable_echo()
@@ -111,8 +125,16 @@ def main():
         with Live(render_grid(grid), refresh_per_second=20, screen=True) as live:
             while True:
                 time.sleep(0.2)
-                grid = update_array(grid, rows, columns)
+                grid = update_array(grid, rows, columns, birth, survive)
                 live.update(render_grid(grid))
+                alive = 0
+                for row in grid:
+                    for cell in row:
+                        if cell:
+                            alive += 1
+                if alive <= 1 and args.infinite:
+                    rows, columns, grid, birth, survive = init_grid(True)
+                    time.sleep(1)
     except KeyboardInterrupt:
         pass
     finally:
