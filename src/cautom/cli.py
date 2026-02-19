@@ -16,6 +16,9 @@ parser.add_argument("--seed", help='Specify seed', type=int)
 parser.add_argument("--prob", help='Specify the probability that each cell is alive (from 1-100)', type=int)
 parser.add_argument("--infinite", action='store_true', help='Generate new seed on complete death')
 parser.add_argument("--customrules", help="Specify custom game rules (B##/S##)", type=str)
+parser.add_argument('--customcolors', help='Specify custom colours for living and dead cells', type=str)
+parser.add_argument('--randomcolors', action='store_true', help='Make alive cells generate with random colors')
+parser.add_argument('--age', action='store_true', help='Darken colours of cells as they get older')
 _saved_settings = None
 args=parser.parse_args()
 
@@ -68,8 +71,21 @@ def init_grid(seed):
         except Exception:
             print("Invalid custom rule format. Use B##/S## (example: B3/S23)")
             sys.exit(1)
+    if args.customcolors:
+        try:
+            colours_raw=args.customcolors.upper().split('/D')
+            alive_colour_str = colours_raw[0][1:]
+            dead_colour_str = colours_raw[1]
+            alive_colour = [int(alive_colour_str[0:3]), int(alive_colour_str[3:6]), int(alive_colour_str[6:9])]
+            dead_colour = [int(dead_colour_str[0:3]), int(dead_colour_str[3:6]), int(dead_colour_str[6:9])]
 
-    return rows, columns, grid, birth, survive
+        except Exception:
+            print("Invalid custom rule format. Use ARRRGGGBBB/DRRRGGGBBB")
+            sys.exit(1)
+    else:
+        alive_colour = [0, 84, 81]
+        dead_colour = [140, 3, 3]
+    return rows, columns, grid, birth, survive, alive_colour, dead_colour
 
 
 def sum_surrounding(grid, x, y):
@@ -103,37 +119,42 @@ def update_array(grid, rows, columns, birth, survive):
     return new_grid
 
 
-def render_grid(grid):
+def render_grid(grid, alive_colours, dead_colours):
     text = Text()
 
     for row in grid:
         for cell in row:
-            if cell:
-                text.append("██", style="rgb(0,84,81)")
+            if cell and not args.randomcolors:
+                if args.age:
+                    text.append("██", style=f"rgb({max(alive_colours[0] - cell * 20, 0)},{max(alive_colours[1] - cell * 20, 0)},{max(alive_colours[2] - cell * 20, 0)})")
+                else:
+                    text.append("██", style=f"rgb({alive_colours[0]},{alive_colours[1]},{alive_colours[2]})")
+            elif cell and args.randomcolors:
+                text.append("██", style=f"rgb({random.randint(0, 255)},{random.randint(0, 255)},{random.randint(0, 255)})")
             else:
-                text.append("██", style="rgb(140,3,3)")
+                text.append("██", style=f"rgb({dead_colours[0]},{dead_colours[1]},{dead_colours[2]})")
         text.append("\n")
     return Panel(text, title="Game of Life", border_style="cyan")
 
 def main():
-    rows, columns, grid, birth, survive = init_grid(None)
+    rows, columns, grid, birth, survive, alive_colours, dead_colours = init_grid(None)
 
     save_terminal_settings()
     disable_echo()
 
     try:
-        with Live(render_grid(grid), refresh_per_second=20, screen=True) as live:
+        with Live(render_grid(grid, alive_colours, dead_colours), refresh_per_second=20, screen=True) as live:
             while True:
                 time.sleep(0.2)
                 grid = update_array(grid, rows, columns, birth, survive)
-                live.update(render_grid(grid))
+                live.update(render_grid(grid, alive_colours, dead_colours))
                 alive = 0
                 for row in grid:
                     for cell in row:
                         if cell:
                             alive += 1
                 if alive <= 1 and args.infinite:
-                    rows, columns, grid, birth, survive = init_grid(True)
+                    rows, columns, grid, birth, survive, alive_colours, dead_colours = init_grid(True)
                     time.sleep(1)
     except KeyboardInterrupt:
         pass
