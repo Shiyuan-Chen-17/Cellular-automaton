@@ -1,6 +1,7 @@
 Simple experiments with cellular automaton. Currently a customisable implementation of conways' game of life; will hopefully include interacive rule setting and beyond directly adjacent neighbour monitoring, along with more interesting visuals.
 
 **Install:**
+
 Homebrew:
 
 ```
