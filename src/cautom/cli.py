@@ -101,8 +101,7 @@ def render_grid(grid):
         text.append("\n")
     return Panel(text, title="Game of Life", border_style="cyan")
 
-
-if __name__ == '__main__':
+def main():
     rows, columns, grid = init_grid()
 
     save_terminal_settings()
@@ -118,3 +117,6 @@ if __name__ == '__main__':
         pass
     finally:
         restore_terminal_settings()
+
+if __name__ == '__main__':
+    main()
