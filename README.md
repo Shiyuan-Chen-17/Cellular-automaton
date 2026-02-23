@@ -1,4 +1,4 @@
-Simple experiments with cellular automaton. Currently a customisable implementation of conways' game of life; will hopefully include interacive rule setting and beyond directly adjacent neighbour monitoring, along with more interesting visuals.
+Highly customisable terminal cellular automaton visualiser, written in python, with a range of features including auto-scaling to terminal, custom rule definition, and custom visualisations (including colour by age). 
 
 **Install:**
 
