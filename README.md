@@ -1,4 +1,4 @@
-Highly customisable terminal cellular automaton visualiser, written in python, with a range of features including auto-scaling to terminal, custom rule definition, and custom visualisations (including colour by age). 
+Highly customisable terminal cellular automaton visualiser, written in python, with a range of features including auto-scaling to terminal, custom seeds, custom rule definition, and custom visualisations (including colour by age). 
 
 <img width="824" height="877" alt="SCR-20260223-qkwu" src="https://github.com/user-attachments/assets/6b5771e7-455f-471f-9386-c1abbed4b971" />
 
