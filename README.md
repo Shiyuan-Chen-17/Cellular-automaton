@@ -11,7 +11,7 @@ Highly customisable terminal cellular automaton visualiser, written in python, w
 Homebrew:
 
 ```
-brew tap Shiyuan-Chen-17/cautom
+brew tap BitPeppr/formulae
 brew install cautom
 ```
 
