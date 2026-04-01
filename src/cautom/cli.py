@@ -1,7 +1,13 @@
 import random
 import time
 import sys
-import termios
+import platform
+try:
+    import termios  # POSIX-only
+    _HAS_TERMIOS = True
+except ImportError:
+    termios = None
+    _HAS_TERMIOS = False
 from rich.live import Live
 from rich.text import Text
 from rich.panel import Panel
@@ -25,17 +31,21 @@ args=parser.parse_args()
 
 def save_terminal_settings():
     global _saved_settings
+    if not _HAS_TERMIOS:
+        return None
     fd = sys.stdin.fileno()
     _saved_settings = termios.tcgetattr(fd)
     return _saved_settings
 
 def restore_terminal_settings():
     global _saved_settings
-    if _saved_settings:
+    if _HAS_TERMIOS and _saved_settings:
         fd = sys.stdin.fileno()
         termios.tcsetattr(fd, termios.TCSADRAIN, _saved_settings)
 
 def disable_echo():
+    if not _HAS_TERMIOS:
+        return
     fd = sys.stdin.fileno()
     new_attr = termios.tcgetattr(fd)
     new_attr[3] = new_attr[3] & ~termios.ECHO 
