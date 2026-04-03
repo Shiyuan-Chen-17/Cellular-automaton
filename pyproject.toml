@@ -9,7 +9,10 @@ description = "Terminal Game of Life simulator"
 readme = "README.md"
 requires-python = ">=3.8"
 authors = [{ name = "Shiyuan Chen" }]
-dependencies = ["rich>=13.0.0"]
+dependencies = ["rich>=13.0.0", "numpy>=1.20.0"]
+
+[project.optional-dependencies]
+perf = ["numpy>=1.20.0"]
 
 [project.scripts]
 cautom = "cautom.cli:main"

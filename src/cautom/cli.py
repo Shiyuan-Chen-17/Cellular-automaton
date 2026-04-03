@@ -2,6 +2,14 @@ import random
 import time
 import sys
 import termios
+# Optional numpy for performance on large grids
+try:
+    import numpy as np
+    HAS_NUMPY = True
+except ImportError:
+    HAS_NUMPY = False
+    np = None
+
 from rich.live import Live
 from rich.text import Text
 from rich.panel import Panel
@@ -89,55 +97,137 @@ def init_grid(seed):
 
 
 def sum_surrounding(grid, x, y):
+    # Optimized: direct indexing instead of repeated lookups
+    row_up = grid[x-1]
+    row = grid[x]
+    row_down = grid[x+1]
     return (
-        grid[x+1][y] +
-        grid[x-1][y] +
-        grid[x][y+1] +
-        grid[x][y-1] +
-        grid[x+1][y+1] +
-        grid[x+1][y-1] +
-        grid[x-1][y+1] +
-        grid[x-1][y-1]
+        row_down[y+1] + row_down[y] + row_down[y-1] +
+        row[y+1] + row[y-1] +
+        row_up[y+1] + row_up[y] + row_up[y-1]
     )
 
 
 def update_array(grid, rows, columns, birth, survive):
+    # Optimized: convert to sets for O(1) lookup instead of O(n)
+    birth_set = set(birth)
+    survive_set = set(survive)
     new_grid = [row[:] for row in grid]
 
+    # Optimized: reduce function call overhead by inlining sum_surrounding
     for x in range(1, rows-1):
+        row_up = grid[x-1]
+        row = grid[x]
+        row_down = grid[x+1]
+        new_row = new_grid[x]
+        
         for y in range(1, columns-1):
+            # Inline neighbour calculation for better performance
+            neighbours = (
+                row_down[y+1] + row_down[y] + row_down[y-1] +
+                row[y+1] + row[y-1] +
+                row_up[y+1] + row_up[y] + row_up[y-1]
+            )
 
-            neighbours = sum_surrounding(grid, x, y)
-
-            if grid[x][y] == 0 and neighbours in birth:
-                new_grid[x][y] = 1
-            elif grid[x][y] != 0 and neighbours in survive:
-                new_grid[x][y] += 1
+            if row[y] == 0:
+                if neighbours in birth_set:
+                    new_row[y] = 1
+                else:
+                    new_row[y] = 0
             else:
-                new_grid[x][y] = 0
+                if neighbours in survive_set:
+                    new_row[y] = row[y] + 1
+                else:
+                    new_row[y] = 0
 
     return new_grid
 
 
+def update_array_numpy(grid_array, birth_set, survive_set):
+    """NumPy-optimized update function for larger grids."""
+    # Roll grid to get neighbours in each direction
+    # This is much faster than nested loops for large grids
+    n = grid_array
+    
+    # Count neighbours using array shifting
+    neighbours = (
+        np.roll(n, 1, axis=0) + np.roll(n, -1, axis=0) +
+        np.roll(n, 1, axis=1) + np.roll(n, -1, axis=1) +
+        np.roll(np.roll(n, 1, axis=0), 1, axis=1) +
+        np.roll(np.roll(n, 1, axis=0), -1, axis=1) +
+        np.roll(np.roll(n, -1, axis=0), 1, axis=1) +
+        np.roll(np.roll(n, -1, axis=0), -1, axis=1)
+    )
+    
+    # Handle edge wrapping - set edge cells to 0
+    neighbours[0, :] = 0
+    neighbours[-1, :] = 0
+    neighbours[:, 0] = 0
+    neighbours[:, -1] = 0
+    
+    # Create new grid
+    new_grid = np.zeros_like(grid_array)
+    
+    # Apply rules using vectorized operations
+    dead_cells = (grid_array == 0)
+    alive_cells = ~dead_cells
+    
+    # Birth: dead cells with exactly birth count neighbours
+    for b in birth_set:
+        new_grid &= (neighbours != b)
+        new_grid |= ((neighbours == b) & dead_cells)
+    
+    # Survival: alive cells with exactly survive count neighbours
+    new_grid = np.zeros_like(grid_array)
+    for b in birth_set:
+        new_grid |= ((neighbours == b) & dead_cells)
+    for s in survive_set:
+        new_grid |= ((neighbours == s) & alive_cells)
+    
+    # Increment age for surviving cells
+    surviving = np.zeros_like(grid_array, dtype=bool)
+    for s in survive_set:
+        surviving |= ((neighbours == s) & alive_cells)
+    new_grid[surviving] = grid_array[surviving] + 1
+    
+    return new_grid
+
+
 def render_grid(grid, alive_colours, dead_colours):
+    # Optimized: pre-build style strings
+    dead_style = f"rgb({dead_colours[0]},{dead_colours[1]},{dead_colours[2]})"
+    alive_style = f"rgb({alive_colours[0]},{alive_colours[1]},{alive_colours[2]})"
+    
     text = Text()
 
     for row in grid:
         for cell in row:
             if cell and not args.randomcolors:
                 if args.age:
-                    text.append("██", style=f"rgb({max(alive_colours[0] - cell * 20, 0)},{max(alive_colours[1] - cell * 20, 0)},{max(alive_colours[2] - cell * 20, 0)})")
+                    # Optimized: calculate color once per cell
+                    age_factor = cell * 20
+                    text.append("██", style=f"rgb({max(alive_colours[0] - age_factor, 0)},{max(alive_colours[1] - age_factor, 0)},{max(alive_colours[2] - age_factor, 0)})")
                 else:
-                    text.append("██", style=f"rgb({alive_colours[0]},{alive_colours[1]},{alive_colours[2]})")
+                    text.append("██", style=alive_style)
             elif cell and args.randomcolors:
                 text.append("██", style=f"rgb({random.randint(0, 255)},{random.randint(0, 255)},{random.randint(0, 255)})")
             else:
-                text.append("██", style=f"rgb({dead_colours[0]},{dead_colours[1]},{dead_colours[2]})")
+                text.append("██", style=dead_style)
         text.append("\n")
     return Panel(text, title="Game of Life", border_style="cyan")
 
 def main():
     rows, columns, grid, birth, survive, alive_colours, dead_colours = init_grid(None)
+    
+    # Pre-compute sets for O(1) lookup
+    birth_set = set(birth)
+    survive_set = set(survive)
+
+    # Use numpy for large grids (optional optimization)
+    use_numpy = False
+    if rows * columns > 10000 and HAS_NUMPY:
+        grid_array = np.array(grid, dtype=np.int32)
+        use_numpy = True
 
     save_terminal_settings()
     disable_echo()
@@ -146,15 +236,22 @@ def main():
         with Live(render_grid(grid, alive_colours, dead_colours), refresh_per_second=20, screen=True) as live:
             while True:
                 time.sleep(0.2)
-                grid = update_array(grid, rows, columns, birth, survive)
+                if use_numpy:
+                    grid_array = update_array_numpy(grid_array, birth_set, survive_set)
+                    grid = grid_array.tolist()
+                else:
+                    grid = update_array(grid, rows, columns, birth, survive)
                 live.update(render_grid(grid, alive_colours, dead_colours))
-                alive = 0
-                for row in grid:
-                    for cell in row:
-                        if cell:
-                            alive += 1
+                
+                # Optimized: count alive cells more efficiently
+                if use_numpy:
+                    alive = np.count_nonzero(grid_array)
+                else:
+                    alive = sum(cell for row in grid for cell in row)
                 if alive <= 1 and args.infinite:
                     rows, columns, grid, birth, survive, alive_colours, dead_colours = init_grid(True)
+                    if use_numpy:
+                        grid_array = np.array(grid, dtype=np.int32)
                     time.sleep(1)
     except KeyboardInterrupt:
         pass
